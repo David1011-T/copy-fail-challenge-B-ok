@@ -1,0 +1,6 @@
+=== HITO 4: PARCHE APLICADO ===
+Fecha: Sat May 16 20:55:40 UTC 2026
+Kernel: 6.12.0
+Identidad: uid=0(root) gid=0(root)
+Intento exploit post-parche:
+python3: can't open file '//copy_fail_exp.py': [Errno 2] No such file or directory
