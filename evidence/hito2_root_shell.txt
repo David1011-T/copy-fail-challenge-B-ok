@@ -1,0 +1,9 @@
+=== HITO 2: EXPLOIT EXITOSO ===
+Fecha: Sat May 16 19:10:42 UTC 2026
+Hostname: copy-fail-David1011-T
+Identidad POST-exploit: root
+Kernel: 6.12.0
+SHA256 del exploit usado:
+d401e7d1c00605749d6c617ace73ab20a762b72e41c2e1590331596e38219a61  copy_fail_exp.py
+
+--- Salida del exploit ---
