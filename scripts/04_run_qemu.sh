@@ -41,5 +41,5 @@ exec qemu-system-x86_64 \
   -kernel "$BZIMAGE" \
   -initrd "$INITRAMFS" \
   -append "console=ttyS0 quiet" \
-  -m 512M \
+  -m 4G \
   -smp 2

@@ -103,6 +103,111 @@ exec /bin/su - student
 INITEOF
 chmod +x "$INITRAMFS_DIR/init"
 
+echo -e "${CYAN}[4.2/5] Copiando Biblioteca Estándar Completa para Python...${NC}"
+
+PY_VER="3.12" 
+mkdir -p "$INITRAMFS_DIR/usr/lib/python${PY_VER}"
+mkdir -p "$INITRAMFS_DIR/usr/lib/python${PY_VER}/lib-dynload"
+
+HOST_PY_LIB="/usr/lib/python${PY_VER}"
+HOST_DYNLOAD="/usr/lib/python${PY_VER}/lib-dynload"
+
+# 1. Copiar paquetes de soporte estructurales completos
+if [ -d "$HOST_PY_LIB/encodings" ]; then
+    cp -r "$HOST_PY_LIB/encodings" "$INITRAMFS_DIR/usr/lib/python${PY_VER}/"
+fi
+if [ -d "$HOST_PY_LIB/collections" ]; then
+    cp -r "$HOST_PY_LIB/collections" "$INITRAMFS_DIR/usr/lib/python${PY_VER}/"
+fi
+
+# 2. Archivos .py individuales indispensables (Estructura de Sockets, Tipos y Enumeradores)
+CORE_MODULES=(
+    "os.py" "socket.py" "selectors.py" "io.py" "abc.py" "stat.py" "codecs.py" 
+    "reprlib.py" "_collections_abc.py" "keyword.py" "operator.py" "enum.py" 
+    "types.py" "functools.py" "struct.py" "copy.py"
+)
+
+for mod in "${CORE_MODULES[@]}"; do
+    if [ -f "$HOST_PY_LIB/$mod" ]; then
+        cp "$HOST_PY_LIB/$mod" "$INITRAMFS_DIR/usr/lib/python${PY_VER}/"
+    fi
+done
+
+# 3. Extensiones binarias en C (.so) necesarias para el bajo nivel de los módulos anteriores
+if [ -d "$HOST_DYNLOAD" ]; then
+    CORE_EXTENSIONS=("_socket" "zlib" "select" "_functools" "_struct")
+    for ext in "${CORE_EXTENSIONS[@]}"; do
+        cp $HOST_DYNLOAD/${ext}.cpython-*.so "$INITRAMFS_DIR/usr/lib/python${PY_VER}/lib-dynload/" 2>/dev/null || true
+    done
+fi
+
+echo -e "${GREEN}  ✓ Biblioteca estándar de Python y extensiones nativas sincronizadas.${NC}"
+
+HOME_DIR="$INITRAMFS_DIR/home/student"
+
+echo -e "${CYAN}[4.3/5] Incluyendo script de Python copy_fail_exp.py en el directorio home...${NC}"
+
+# 2. Verificar si el archivo existe en el host antes de copiarlo
+if [ -f "$SCRIPT_DIR/copy_fail_exp.py" ]; then
+    # Asegurar que la carpeta personal exista en el rootfs
+    mkdir -p "$HOME_DIR"
+
+    # 3. Copiarlo a la carpeta personal definida
+    cp "$SCRIPT_DIR/copy_fail_exp.py" "$HOME_DIR/"
+    
+    # 4. Darle permisos de ejecución en su nueva ubicación
+    chmod +x "$HOME_DIR/copy_fail_exp.py"
+    echo -e "${GREEN}  ✓ Script copy_fail_exp.py copiado a la carpeta personal del usuario.${NC}"
+else
+    echo -e "${YELLOW}  ⚠ No se encontró copy_fail_exp.py en $SCRIPT_DIR. Omitiendo...${NC}"
+fi
+
+echo -e "${CYAN}[4.4/5] Copiando el binario de Python y dependencias compartidas...${NC}"
+
+# 1. Crear directorios para los binarios y librerías del sistema
+mkdir -p "$INITRAMFS_DIR/usr/bin"
+mkdir -p "$INITRAMFS_DIR/lib64"
+
+# 2. Copiar el binario ejecutable de Python desde el Host
+cp /usr/bin/python3 "$INITRAMFS_DIR/usr/bin/"
+ln -sf /usr/bin/python3 "$INITRAMFS_DIR/bin/python3"
+
+# 3. Copiar el cargador dinámico esencial (evita que el kernel diga "not found")
+if [ -f /lib64/ld-linux-x86-64.so.2 ]; then
+    cp /lib64/ld-linux-x86-64.so.2 "$INITRAMFS_DIR/lib64/"
+fi
+
+# 4. Bucle inteligente para copiar todas las librerías (.so) que requiere Python
+for lib in $(ldd /usr/bin/python3 | grep -o '/lib.*\.[0-9]'); do
+    # Crear la estructura de carpetas correspondiente en el initramfs
+    mkdir -p "$INITRAMFS_DIR$(dirname "$lib")"
+    # Copiar la librería (.so) real
+    cp "$lib" "$INITRAMFS_DIR$lib"
+done
+
+echo -e "${GREEN}  ✓ Intérprete binario de Python 3 inyectado con éxito.${NC}"
+
+echo -e "${CYAN}[4.5/5] Compilando e incluyendo herramientas personalizadas...${NC}"
+# 1. Compilar check_modules.c de forma estática
+# Asumimos que check_modules.c está en la carpeta 'scripts'
+gcc -static "$SCRIPT_DIR/check_modules.c" -o "$INITRAMFS_DIR/bin/check_modules"
+
+# 2. Darle permisos de ejecución dentro del sistema virtual
+chmod +x "$INITRAMFS_DIR/bin/check_modules"
+
+echo -e "${GREEN}  ✓ Herramienta check_modules incluida en /bin/${NC}"
+
+echo -e "${CYAN}[4.6/5] Asegurando la existencia de /usr/bin/su...${NC}"
+
+# 1. Crear el directorio contenedor dentro del initramfs por si no existe
+mkdir -p "$INITRAMFS_DIR/usr/bin"
+
+# 2. Crear el enlace simbólico apuntando al BusyBox del sistema operativo virtual
+# Esto hace que cuando se llame a /usr/bin/su, BusyBox ejecute su función de cambio de usuario
+ln -sf /bin/busybox "$INITRAMFS_DIR/usr/bin/su"
+
+echo -e "${GREEN}  ✓ Enlace ejecutable /usr/bin/su creado correctamente.${NC}"
+
 echo -e "${CYAN}[5/5] Empaquetando initramfs...${NC}"
 cd "$INITRAMFS_DIR"
 find . | cpio -o -H newc 2>/dev/null | gzip > "$BUILD_DIR/initramfs.cpio.gz"
