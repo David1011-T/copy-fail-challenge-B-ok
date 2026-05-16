@@ -124,3 +124,5 @@ Esta v2 incorpora los siguientes fixes respecto a la v1:
 - BusyBox: deshabilitado `CONFIG_TC` (rompe compilación con kernels nuevos)
 - BusyBox: forzado `CONFIG_STATIC=y` y verificado con `file`
 - Workflow Actions: greps de verificación con `|| echo`, tolerantes
+
+

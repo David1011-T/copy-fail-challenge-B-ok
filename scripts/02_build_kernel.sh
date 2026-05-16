@@ -77,6 +77,9 @@ make tinyconfig
 
 make olddefconfig
 
+sed -i 's/# CONFIG_MODULES is not set/CONFIG_MODULES=y/' .config
+echo "CONFIG_CRYPTO_USER_API_AEAD=m" >> .config
+
 echo -e "${CYAN}[3/4] Compilando bzImage con ${JOBS} cores (~20-25 min)...${NC}"
 make -j"$JOBS" bzImage 2>&1 | tail -5
 
